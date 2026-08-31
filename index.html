@@ -80,6 +80,7 @@ h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 .day-pills { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
 .pill { font-size: 10.5px; font-weight: 600; padding: 2px 5px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pill-more { font-size: 10px; font-weight: 700; color: var(--ink-soft); padding: 1px 3px; }
+.pill-busy { background: transparent; border: 1px dashed; font-weight: 600; }
 
 .fab { position: fixed; right: 20px; bottom: 24px; width: 58px; height: 58px; border-radius: 50%; background: var(--accent); color: #fff; border: none; font-size: 30px; line-height: 1; box-shadow: var(--shadow); cursor: pointer; z-index: 20; }
 
@@ -125,6 +126,7 @@ h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 
 .event-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 11px 6px; border: none; background: none; border-bottom: 1px solid var(--border); cursor: pointer; color: var(--ink); }
 .event-row:last-child { border-bottom: none; }
+.event-row-static { cursor: default; }
 .event-row-title { flex: 1; font-weight: 600; }
 .event-row-time { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 13px; }
 .event-row-recur { font-size: 11px; color: var(--accent-strong); background: var(--accent-soft); padding: 2px 7px; border-radius: 999px; }
@@ -141,6 +143,12 @@ h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 .you-tag { color: var(--ink-soft); font-weight: 500; font-size: 12px; }
 .people-row .link-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
 .inline-add-person { margin-top: 4px; }
+.people-row-block { border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 4px; }
+.people-row-block .people-row { border-bottom: none; padding-bottom: 2px; }
+.ics-details { padding: 0 4px 8px 34px; }
+.ics-details summary { list-style: none; cursor: pointer; font-size: 12.5px; }
+.ics-details summary::-webkit-details-marker { display: none; }
+.ics-details form { margin-top: 8px; }
 
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all 0.2s ease-out; z-index: 50; max-width: 88vw; text-align: center; box-shadow: var(--shadow); }
 .toast-show { opacity: 1; transform: translate(-50%, 0); }
@@ -212,7 +220,7 @@ var firebaseConfig = {
   function safeSet(key, val) { try { localStorage.setItem(key, val); } catch (e) { /* ignore */ } }
   function safeRemove(key) { try { localStorage.removeItem(key); } catch (e) { /* ignore */ } }
 
-  var state = { people: {}, events: {} };
+  var state = { people: {}, events: {}, busy: {} };
   var peopleLoaded = false, eventsLoaded = false, isOnline = true;
   var showingCachedSnapshot = false;
 
@@ -221,9 +229,11 @@ var firebaseConfig = {
   try {
     var cachedPeopleRaw = safeGet('fk_snapshot_people');
     var cachedEventsRaw = safeGet('fk_snapshot_events');
+    var cachedBusyRaw = safeGet('fk_snapshot_busy');
     if (cachedPeopleRaw && cachedEventsRaw) {
       state.people = JSON.parse(cachedPeopleRaw);
       state.events = JSON.parse(cachedEventsRaw);
+      if (cachedBusyRaw) state.busy = JSON.parse(cachedBusyRaw);
       peopleLoaded = true;
       eventsLoaded = true;
       showingCachedSnapshot = true;
@@ -335,6 +345,58 @@ var firebaseConfig = {
       return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0);
     });
   }
+
+  // Busy blocks come from a family member's own Outlook/iCloud calendar (synced by a
+  // scheduled job outside this page). They carry only start/end/allDay — never a title,
+  // location or description — by design, so nothing sensitive ever reaches this app.
+  function busyList() {
+    var out = [];
+    for (var pid in state.busy) {
+      if (!state.busy.hasOwnProperty(pid)) continue;
+      var blocks = state.busy[pid] || {};
+      for (var bid in blocks) {
+        if (!blocks.hasOwnProperty(bid)) continue;
+        var b = blocks[bid];
+        if (!b || !b.start || !b.end) continue;
+        out.push({ id: bid, personId: pid, start: b.start, end: b.end, allDay: !!b.allDay });
+      }
+    }
+    return out;
+  }
+  function busyOccurrencesInRange(b, rangeStartISO, rangeEndISO) {
+    var s = new Date(b.start), e = new Date(b.end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return [];
+    var lastMoment = new Date(e.getTime() - 1);
+    var dayFrom = isoDate(s.getFullYear(), s.getMonth(), s.getDate());
+    var dayTo = isoDate(lastMoment.getFullYear(), lastMoment.getMonth(), lastMoment.getDate());
+    if (dayTo < dayFrom) dayTo = dayFrom;
+    var out = [];
+    var cur = parseISO(dayFrom);
+    var stop = parseISO(dayTo);
+    var rs = parseISO(rangeStartISO), re = parseISO(rangeEndISO);
+    var guard = 0;
+    while (cur <= stop && guard < 400) {
+      if (cur >= rs && cur <= re) out.push(isoDate(cur.getFullYear(), cur.getMonth(), cur.getDate()));
+      cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+      guard++;
+    }
+    return out;
+  }
+  function busyForRange(rangeStartISO, rangeEndISO) {
+    var out = [];
+    busyList().forEach(function (b) {
+      busyOccurrencesInRange(b, rangeStartISO, rangeEndISO).forEach(function (d) { out.push({ date: d, busy: b }); });
+    });
+    return out;
+  }
+  function busyForDay(dateISO) { return busyForRange(dateISO, dateISO).map(function (x) { return x.busy; }); }
+  function formatBusyTime(b) {
+    if (b.allDay) return 'ganztägig';
+    var s = new Date(b.start), e = new Date(b.end);
+    function hm(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+    return hm(s) + '–' + hm(e);
+  }
+
   function monthGridDates(year, month) {
     var first = new Date(year, month, 1);
     var firstWeekday = (first.getDay() + 6) % 7;
@@ -392,12 +454,19 @@ var firebaseConfig = {
       if (filterId !== 'all' && o.event.personId !== filterId) return;
       (byDate[o.date] = byDate[o.date] || []).push(o.event);
     });
+    var busyOcc = busyForRange(rangeStart, rangeEnd);
+    var busyByDate = {};
+    busyOcc.forEach(function (o) {
+      if (filterId !== 'all' && o.busy.personId !== filterId) return;
+      (busyByDate[o.date] = busyByDate[o.date] || []).push(o.busy);
+    });
     var todayIso = todayISO();
     var maxShow = 3;
     var cells = days.map(function (d) {
       var iso = isoDate(d.getFullYear(), d.getMonth(), d.getDate());
       var inMonth = d.getMonth() === viewMonth;
       var evs = sortEventsByTime(byDate[iso] || []);
+      var busyToday = busyByDate[iso] || [];
       var isToday = iso === todayIso;
       var pills = evs.slice(0, maxShow).map(function (ev) {
         var p = personById(ev.personId);
@@ -405,10 +474,18 @@ var firebaseConfig = {
         var label = (ev.time ? ev.time + ' ' : '') + escapeHtml(ev.title);
         return '<div class="pill" style="background:' + color + ';color:' + contrastText(color) + '">' + label + '</div>';
       }).join('');
-      var more = evs.length > maxShow ? '<div class="pill-more">+' + (evs.length - maxShow) + ' mehr</div>' : '';
+      var remainingSlots = Math.max(0, maxShow - evs.length);
+      var busyPills = busyToday.slice(0, remainingSlots).map(function (b) {
+        var p = personById(b.personId);
+        var color = p ? p.color : '#999999';
+        return '<div class="pill pill-busy" style="border-color:' + color + ';color:' + color + '">' + escapeHtml(p ? p.name : '?') + ' beschäftigt</div>';
+      }).join('');
+      var shownCount = Math.min(evs.length, maxShow) + Math.min(busyToday.length, remainingSlots);
+      var totalCount = evs.length + busyToday.length;
+      var more = totalCount > shownCount ? '<div class="pill-more">+' + (totalCount - shownCount) + ' mehr</div>' : '';
       return '<button type="button" class="day-cell' + (inMonth ? '' : ' day-outside') + (isToday ? ' day-today' : '') + '" data-action="open-day" data-date="' + iso + '">'
         + '<span class="day-num">' + d.getDate() + '</span>'
-        + '<div class="day-pills">' + pills + more + '</div>'
+        + '<div class="day-pills">' + pills + busyPills + more + '</div>'
         + '</button>';
     }).join('');
     return '<div class="weekday-row">' + WEEKDAYS.map(function (w) { return '<div class="weekday">' + w + '</div>'; }).join('') + '</div>'
@@ -426,9 +503,21 @@ var firebaseConfig = {
         + (ev.recurrence && ev.recurrence !== 'none' ? '<span class="event-row-recur">' + RECUR_LABELS[ev.recurrence] + '</span>' : '')
         + '</button>';
     }).join('') : '<p class="empty-hint">Keine Termine an diesem Tag.</p>';
+    var busyToday = busyForDay(date);
+    var busySection = busyToday.length ? (''
+      + '<div class="field-label" style="margin-top:14px">Beschäftigt (aus externem Kalender)</div>'
+      + busyToday.map(function (b) {
+        var p = personById(b.personId);
+        return '<div class="event-row event-row-static">'
+          + '<span class="dot" style="background:' + (p ? p.color : '#999999') + '"></span>'
+          + '<span class="event-row-title">' + escapeHtml(p ? p.name : '?') + '</span>'
+          + '<span class="event-row-time">' + formatBusyTime(b) + '</span>'
+          + '</div>';
+      }).join('')
+    ) : '';
     return modalWrap('day-sheet', ''
       + '<div class="sheet-header"><h2>' + formatFullDate(d) + '</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">&times;</button></div>'
-      + '<div class="sheet-body">' + items
+      + '<div class="sheet-body">' + items + busySection
       + '<button type="button" class="btn btn-primary btn-block" data-action="open-add" data-date="' + date + '">+ Termin hinzufügen</button>'
       + '</div>'
     );
@@ -474,11 +563,24 @@ var firebaseConfig = {
     var rows = peopleList().map(function (p) {
       var count = eventsList().filter(function (e) { return e.personId === p.id; }).length;
       var isMe = p.id === myPersonId;
-      return '<div class="people-row">'
+      var hasIcs = !!(p.icsUrl && p.icsUrl.trim());
+      return '<div class="people-row-block">'
+        + '<div class="people-row">'
         + '<span class="dot" style="background:' + p.color + '"></span>'
         + '<span class="people-row-name">' + escapeHtml(p.name) + (isMe ? ' <span class="you-tag">(du)</span>' : '') + '</span>'
         + (!isMe ? '<button type="button" class="link-btn" data-action="select-person" data-id="' + p.id + '">Das bin ich</button>' : '')
         + '<button type="button" class="link-btn link-danger" data-action="remove-person" data-id="' + p.id + '"' + (count > 0 ? ' disabled title="Hat noch Termine"' : '') + '>Entfernen</button>'
+        + '</div>'
+        + '<details class="ics-details">'
+        + '<summary class="link-btn">' + (hasIcs ? 'Kalender verbunden ✓ – Link ändern' : 'Kalender verbinden (Outlook/iCloud)') + '</summary>'
+        + '<form data-form="ics-link" data-person-id="' + p.id + '">'
+        + '<input class="text-input" name="icsUrl" type="url" placeholder="https://... (öffentlicher ICS-Link, nur frei/beschäftigt)" value="' + escapeHtml(p.icsUrl || '') + '" autocomplete="off">'
+        + '<div class="sheet-actions">'
+        + (hasIcs ? '<button type="button" class="btn btn-danger" data-action="remove-ics" data-person-id="' + p.id + '">Trennen</button>' : '<span></span>')
+        + '<button type="submit" class="btn btn-secondary">Speichern</button>'
+        + '</div>'
+        + '</form>'
+        + '</details>'
         + '</div>';
     }).join('');
     var addForm = ''
@@ -596,6 +698,23 @@ var firebaseConfig = {
     }).catch(function (err) { showToast('Entfernen fehlgeschlagen: ' + err.message); });
   }
 
+  function handleSaveIcsUrl(form) {
+    var personId = form.getAttribute('data-person-id');
+    var url = (new FormData(form).get('icsUrl') || '').toString().trim();
+    if (url && !/^(https?|webcal):\/\//i.test(url)) { showToast('Bitte einen gültigen Link eingeben (beginnend mit https:// oder webcal://).'); return; }
+    db.ref('people/' + personId + '/icsUrl').set(url || null).then(function () {
+      showToast(url ? 'Kalender verbunden. Die Termine erscheinen innerhalb einer Stunde.' : 'Verbindung getrennt.');
+      render();
+    }).catch(function (err) { showToast('Speichern fehlgeschlagen: ' + err.message); });
+  }
+
+  function handleRemoveIcs(personId) {
+    db.ref('people/' + personId + '/icsUrl').remove().then(function () {
+      showToast('Verbindung getrennt.');
+      render();
+    }).catch(function (err) { showToast('Trennen fehlgeschlagen: ' + err.message); });
+  }
+
   appEl.addEventListener('click', function (e) {
     var el = e.target.closest('[data-action]');
     if (!el) return;
@@ -613,11 +732,13 @@ var firebaseConfig = {
     if (action === 'select-person') { handleSelectPerson(el.getAttribute('data-id')); return; }
     if (action === 'delete-event') { var eid = el.getAttribute('data-id'); if (window.confirm('Diesen Termin wirklich löschen?')) handleDeleteEvent(eid); return; }
     if (action === 'remove-person') { if (el.disabled) return; var pid = el.getAttribute('data-id'); if (window.confirm('Diese Person wirklich entfernen?')) handleRemovePerson(pid); return; }
+    if (action === 'remove-ics') { var icsPid = el.getAttribute('data-person-id'); if (window.confirm('Kalender-Verbindung wirklich trennen?')) handleRemoveIcs(icsPid); return; }
   });
   appEl.addEventListener('submit', function (e) {
     var form = e.target;
     if (form.matches('[data-form="add-person-first"]') || form.matches('[data-form="add-person"]')) { e.preventDefault(); handleAddPerson(form); }
     else if (form.matches('[data-form="event"]')) { e.preventDefault(); handleSaveEvent(form); }
+    else if (form.matches('[data-form="ics-link"]')) { e.preventDefault(); handleSaveIcsUrl(form); }
   });
 
   db.ref('people').on('value', function (snap) {
@@ -633,6 +754,12 @@ var firebaseConfig = {
     try { safeSet('fk_snapshot_events', JSON.stringify(state.events)); } catch (e) { /* ignore */ }
     render();
   }, function (err) { showToast('Verbindung zur Datenbank fehlgeschlagen: ' + err.message); });
+
+  db.ref('busyBlocks').on('value', function (snap) {
+    state.busy = snap.val() || {};
+    try { safeSet('fk_snapshot_busy', JSON.stringify(state.busy)); } catch (e) { /* ignore */ }
+    if (peopleLoaded && eventsLoaded) render();
+  }); // no error toast here: this is a secondary feature, a family member simply may not have connected a calendar yet
 
   db.ref('.info/connected').on('value', function (snap) { isOnline = !!snap.val(); if (peopleLoaded && eventsLoaded) render(); });
 
