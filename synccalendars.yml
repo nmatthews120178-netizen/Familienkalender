@@ -1,0 +1,28 @@
+name: Sync external calendars
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # every hour, on the hour (UTC)
+  workflow_dispatch: {}     # lets you trigger a sync manually from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: sync/package-lock.json
+
+      - name: Install dependencies
+        working-directory: sync
+        run: npm ci
+
+      - name: Sync calendars
+        working-directory: sync
+        env:
+          FIREBASE_DB_URL: https://familienkalender-639eb-default-rtdb.europe-west1.firebasedatabase.app
+        run: npm run sync
