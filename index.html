@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Familienkalender</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2F6F62">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Familie">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #F4F6F5;
+  --surface: #FFFFFF;
+  --surface-alt: #EAF0EE;
+  --ink: #1E2B28;
+  --ink-soft: #62726E;
+  --accent: #2F6F62;
+  --accent-strong: #1F5348;
+  --accent-soft: #DCEAE6;
+  --border: #DDE4E1;
+  --danger: #B4433A;
+  --danger-soft: #F5DEDB;
+  --shadow: 0 10px 30px rgba(30,43,40,0.14);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10201C; --surface: #162925; --surface-alt: #1D332E; --ink: #E9F2EF; --ink-soft: #9BB2AC;
+    --accent: #74C4AD; --accent-strong: #9BDAC5; --accent-soft: #223F38; --border: #294540;
+    --danger: #E6897C; --danger-soft: #3A2422; --shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10201C; --surface: #162925; --surface-alt: #1D332E; --ink: #E9F2EF; --ink-soft: #9BB2AC;
+  --accent: #74C4AD; --accent-strong: #9BDAC5; --accent-soft: #223F38; --border: #294540;
+  --danger: #E6897C; --danger-soft: #3A2422; --shadow: 0 10px 30px rgba(0,0,0,0.45);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+button, input, select { font-family: inherit; font-size: inherit; color: inherit; }
+h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#app { max-width: 720px; margin: 0 auto; padding: 0 0 96px; min-height: 100vh; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 16px 10px; gap: 12px; }
+.app-title { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: -0.01em; }
+.app-title-lg { font-family: var(--font-display); font-weight: 600; font-size: 30px; letter-spacing: -0.01em; margin-bottom: 8px; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+.badge-readonly { font-size: 12px; font-weight: 600; color: var(--danger); background: var(--danger-soft); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.pill-btn { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px 6px 6px; cursor: pointer; font-weight: 600; color: var(--ink); }
+.dot { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+
+.month-nav { display: flex; align-items: center; gap: 10px; padding: 4px 16px 12px; }
+.month-label { font-family: var(--font-display); font-size: 19px; font-weight: 600; flex: 1; text-align: center; }
+.icon-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; color: var(--ink); }
+.btn-today { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 8px 14px; font-weight: 600; cursor: pointer; color: var(--accent-strong); }
+
+.chip-row { display: flex; gap: 8px; padding: 0 16px 14px; overflow-x: auto; }
+.chip { display: flex; align-items: center; gap: 6px; flex-shrink: 0; border: 1.5px solid var(--border); background: var(--surface); color: var(--ink-soft); border-radius: 999px; padding: 7px 14px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.chip-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip-dot { width: 9px; height: 9px; border-radius: 50%; }
+
+.weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 10px; }
+.weekday { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--ink-soft); padding-bottom: 6px; text-transform: uppercase; }
+.month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 10px; }
+.day-cell { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); min-height: 74px; padding: 6px 5px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 3px; color: var(--ink); }
+.day-outside { opacity: 0.42; }
+.day-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.day-num { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
+.day-pills { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.pill { font-size: 10.5px; font-weight: 600; padding: 2px 5px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill-more { font-size: 10px; font-weight: 700; color: var(--ink-soft); padding: 1px 3px; }
+
+.fab { position: fixed; right: 20px; bottom: 24px; width: 58px; height: 58px; border-radius: 50%; background: var(--accent); color: #fff; border: none; font-size: 30px; line-height: 1; box-shadow: var(--shadow); cursor: pointer; z-index: 20; }
+
+.onboard { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.onboard-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px 24px; max-width: 420px; width: 100%; }
+.onboard-lead { color: var(--ink-soft); margin: 0 0 18px; font-size: 14px; }
+.person-pick-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.person-pick { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-weight: 600; cursor: pointer; text-align: left; color: var(--ink); }
+.person-pick:hover { background: var(--surface-alt); }
+.add-person-details { margin-top: 4px; }
+.add-person-details summary { list-style: none; cursor: pointer; }
+.add-person-details summary::-webkit-details-marker { display: none; }
+.add-person-details form { margin-top: 12px; }
+
+.field-label { font-size: 12px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; margin: 14px 0 6px; }
+.field-label:first-child { margin-top: 0; }
+.text-input { width: 100%; border: 1px solid var(--border); background: var(--bg); color: var(--ink); border-radius: var(--radius-sm); padding: 11px 12px; margin-bottom: 4px; }
+.field-hidden { display: none; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; margin: 14px 0 6px; font-weight: 600; font-size: 14px; cursor: pointer; }
+.checkbox-row:has(#ev-hastime:checked) + #ev-time { display: block; }
+.color-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
+.swatch { position: relative; width: 34px; height: 34px; border-radius: 50%; background: var(--sc); cursor: pointer; border: 3px solid transparent; display: inline-flex; }
+.swatch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.swatch:has(input:checked) { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--sc); }
+.link-btn { background: none; border: none; color: var(--accent-strong); font-weight: 600; cursor: pointer; padding: 6px 0; font-size: 13px; }
+.link-danger { color: var(--danger); }
+
+.btn { border: none; border-radius: var(--radius-sm); padding: 12px 18px; font-weight: 700; cursor: pointer; }
+.btn-block { width: 100%; margin-top: 16px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-secondary { background: var(--surface-alt); color: var(--ink); }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+
+.overlay { position: fixed; inset: 0; background: rgba(16,26,23,0.42); display: flex; align-items: flex-end; justify-content: center; z-index: 30; animation: fadeIn 0.15s ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.sheet { background: var(--surface); width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; border-radius: 20px 20px 0 0; box-shadow: var(--shadow); animation: slideUp 0.18s ease-out; }
+@media (min-width: 560px) { .overlay { align-items: center; } .sheet { border-radius: var(--radius); max-height: 84vh; } }
+@keyframes slideUp { from { transform: translateY(24px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 6px; position: sticky; top: 0; background: var(--surface); }
+.sheet-header h2 { font-size: 19px; }
+.sheet-body { padding: 8px 18px 22px; }
+.sheet-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 18px; }
+
+.event-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 11px 6px; border: none; background: none; border-bottom: 1px solid var(--border); cursor: pointer; color: var(--ink); }
+.event-row:last-child { border-bottom: none; }
+.event-row-title { flex: 1; font-weight: 600; }
+.event-row-time { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 13px; }
+.event-row-recur { font-size: 11px; color: var(--accent-strong); background: var(--accent-soft); padding: 2px 7px; border-radius: 999px; }
+.empty-hint { color: var(--ink-soft); font-size: 14px; padding: 14px 6px; }
+
+.person-radio-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.person-radio { border: 1.5px solid var(--pc); color: var(--pc); border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: 13px; cursor: pointer; background: transparent; }
+.person-radio input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.person-radio:has(input:checked) { background: var(--pc); color: var(--pc-text); }
+
+.people-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+.people-row:last-of-type { border-bottom: none; }
+.people-row-name { flex: 1; font-weight: 600; }
+.you-tag { color: var(--ink-soft); font-weight: 500; font-size: 12px; }
+.people-row .link-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.inline-add-person { margin-top: 4px; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all 0.2s ease-out; z-index: 50; max-width: 88vw; text-align: center; box-shadow: var(--shadow); }
+.toast-show { opacity: 1; transform: translate(-50%, 0); }
+
+.offline-banner { position: fixed; top: 0; left: 0; right: 0; background: var(--danger); color: #fff; text-align: center; font-size: 12.5px; font-weight: 600; padding: 6px; z-index: 60; }
+
+.loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); font-weight: 600; }
+
+.setup-card { max-width: 620px; }
+.setup-card ol { padding-left: 20px; margin: 0 0 18px; }
+.setup-card li { margin-bottom: 10px; }
+.code-block { background: var(--surface-alt); border-radius: var(--radius-sm); padding: 12px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; overflow-x: auto; white-space: pre; margin: 8px 0; }
+
+@media (prefers-reduced-motion: reduce) { .overlay, .sheet { animation: none; } .toast { transition: none; } }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading-screen">Familienkalender lädt …</div></div>
+
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-database-compat.js"></script>
+<script>
+/* =========================================================================
+   FIREBASE-KONFIGURATION
+   Ersetze die Werte unten durch die Konfiguration aus deinem eigenen
+   Firebase-Projekt (Projekteinstellungen -> Deine Apps -> Web-App).
+   ========================================================================= */
+var firebaseConfig = {
+  apiKey: "AIzaSyA68hZmQeOUfkbx3LCz1P3XcMd1xdTC6Vg",
+  authDomain: "familienkalender-639eb.firebaseapp.com",
+  databaseURL: "https://familienkalender-639eb-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "familienkalender-639eb",
+  storageBucket: "familienkalender-639eb.firebasestorage.app",
+  messagingSenderId: "1089240167842",
+  appId: "1:1089240167842:web:55f4f53eccb8edcb78eefb"
+};
+/* ========================================================================= */
+
+(function () {
+  'use strict';
+
+  var appEl = document.getElementById('app');
+
+  if (!firebaseConfig || firebaseConfig.apiKey === 'DEIN_API_KEY_HIER') {
+    appEl.innerHTML = ''
+      + '<div class="onboard"><div class="onboard-card setup-card">'
+      + '<h1 class="app-title-lg">Fast fertig</h1>'
+      + '<p class="onboard-lead">Diese Seite braucht noch die Verbindung zu deiner eigenen (kostenlosen) Firebase-Datenbank, bevor der Kalender funktioniert.</p>'
+      + '<ol>'
+      + '<li>Gehe zu <strong>console.firebase.google.com</strong> und erstelle ein neues Projekt (Google-Analytics kannst du deaktivieren).</li>'
+      + '<li>Im Projekt links im Menü: <strong>Build &rarr; Realtime Database &rarr; Create database</strong>. Region w&auml;hlen, dann mit den Standard-Regeln starten.</li>'
+      + '<li>Dort auf den Reiter <strong>Rules</strong> wechseln und dauerhaft folgende Regeln eintragen (sonst laufen die Standardregeln nach 30 Tagen ab):'
+      + '<div class="code-block">{\n  "rules": {\n    ".read": true,\n    ".write": true\n  }\n}</div></li>'
+      + '<li>Zur&uuml;ck zur Projekt&uuml;bersicht &rarr; Zahnrad-Symbol &rarr; <strong>Projekteinstellungen</strong> &rarr; unten bei "Deine Apps" auf das Web-Symbol (&lt;/&gt;) klicken, App registrieren (Firebase Hosting nicht n&ouml;tig).</li>'
+      + '<li>Das angezeigte <code>firebaseConfig</code>-Objekt kopieren und am Anfang dieser Datei einf&uuml;gen (Suche nach "DEIN_API_KEY_HIER").</li>'
+      + '<li>Datei speichern und die Seite neu laden.</li>'
+      + '</ol>'
+      + '</div></div>';
+    return;
+  }
+
+  var PERSON_COLORS = ['#D6604C', '#3E7CB1', '#C99A2E', '#8C6BB8', '#5B9A6F', '#C15A87', '#4A90A4', '#A67C52'];
+  var WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  var WEEKDAYS_FULL = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+  var MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  var RECUR_LABELS = { none: 'Keine Wiederholung', weekly: 'Wöchentlich', monthly: 'Monatlich', yearly: 'Jährlich' };
+
+  function safeGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function safeSet(key, val) { try { localStorage.setItem(key, val); } catch (e) { /* ignore */ } }
+  function safeRemove(key) { try { localStorage.removeItem(key); } catch (e) { /* ignore */ } }
+
+  var state = { people: {}, events: {} };
+  var peopleLoaded = false, eventsLoaded = false, isOnline = true;
+  var showingCachedSnapshot = false;
+
+  // Show the last-synced snapshot immediately (installed-app feel: instant paint,
+  // works for a moment even offline) while the live Firebase listeners connect.
+  try {
+    var cachedPeopleRaw = safeGet('fk_snapshot_people');
+    var cachedEventsRaw = safeGet('fk_snapshot_events');
+    if (cachedPeopleRaw && cachedEventsRaw) {
+      state.people = JSON.parse(cachedPeopleRaw);
+      state.events = JSON.parse(cachedEventsRaw);
+      peopleLoaded = true;
+      eventsLoaded = true;
+      showingCachedSnapshot = true;
+    }
+  } catch (e) { /* ignore malformed cache */ }
+
+  var myPersonId = safeGet('fk_myPersonId') || null;
+  var filterId = safeGet('fk_filterId') || 'all';
+  var today0 = new Date();
+  var storedYear = parseInt(safeGet('fk_viewYear'), 10);
+  var storedMonth = parseInt(safeGet('fk_viewMonth'), 10);
+  var viewYear = isNaN(storedYear) ? today0.getFullYear() : storedYear;
+  var viewMonth = isNaN(storedMonth) ? today0.getMonth() : storedMonth;
+  var activeModal = null;
+
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+
+  if (showingCachedSnapshot) { render(); }
+
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function isoDate(y, m, d) { return y + '-' + pad2(m + 1) + '-' + pad2(d); }
+  function parseISO(s) { var p = s.split('-'); return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)); }
+  function todayISO() { var t = new Date(); return isoDate(t.getFullYear(), t.getMonth(), t.getDate()); }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function peopleList() {
+    var out = [];
+    for (var id in state.people) { if (state.people.hasOwnProperty(id)) out.push(Object.assign({ id: id }, state.people[id])); }
+    return out;
+  }
+  function eventsList() {
+    var out = [];
+    for (var id in state.events) { if (state.events.hasOwnProperty(id)) out.push(Object.assign({ id: id }, state.events[id])); }
+    return out;
+  }
+  function personById(id) { return (id && state.people[id]) ? Object.assign({ id: id }, state.people[id]) : null; }
+  function contrastText(hex) {
+    var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return lum > 0.6 ? '#1E2B28' : '#FFFFFF';
+  }
+  function unusedColor() {
+    var used = peopleList().map(function (p) { return p.color; });
+    for (var i = 0; i < PERSON_COLORS.length; i++) { if (used.indexOf(PERSON_COLORS[i]) === -1) return PERSON_COLORS[i]; }
+    return PERSON_COLORS[peopleList().length % PERSON_COLORS.length];
+  }
+  function formatFullDate(d) {
+    var idx = (d.getDay() + 6) % 7;
+    return WEEKDAYS_FULL[idx] + ', ' + d.getDate() + '. ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  function eventOccurrencesInRange(ev, rangeStartISO, rangeEndISO) {
+    var base = parseISO(ev.date);
+    var rangeStart = parseISO(rangeStartISO), rangeEnd = parseISO(rangeEndISO);
+    var out = [];
+    var recurrence = ev.recurrence || 'none';
+    if (recurrence === 'none') {
+      if (base >= rangeStart && base <= rangeEnd) out.push(ev.date);
+      return out;
+    }
+    if (recurrence === 'weekly') {
+      var cur = new Date(base.getTime());
+      while (cur < rangeStart) cur = new Date(cur.getTime() + 7 * 86400000);
+      while (cur <= rangeEnd) { out.push(isoDate(cur.getFullYear(), cur.getMonth(), cur.getDate())); cur = new Date(cur.getTime() + 7 * 86400000); }
+      return out;
+    }
+    if (recurrence === 'monthly') {
+      var day = base.getDate(); var cy = base.getFullYear(), cm = base.getMonth(); var guard = 0;
+      while (guard < 1200) {
+        var monthStart = new Date(cy, cm, 1);
+        if (monthStart > rangeEnd) break;
+        var d = new Date(cy, cm, day);
+        if (d.getMonth() === cm && d >= base && d >= rangeStart && d <= rangeEnd) out.push(isoDate(cy, cm, day));
+        cm++; if (cm > 11) { cm = 0; cy++; }
+        guard++;
+      }
+      return out;
+    }
+    if (recurrence === 'yearly') {
+      var mm = base.getMonth(), dd = base.getDate(); var yy = base.getFullYear(); var g2 = 0;
+      while (g2 < 200) {
+        var yearStart = new Date(yy, 0, 1);
+        if (yearStart > rangeEnd) break;
+        var dt = new Date(yy, mm, dd);
+        if (dt.getMonth() === mm && dt >= base && dt >= rangeStart && dt <= rangeEnd) out.push(isoDate(yy, mm, dd));
+        yy++; g2++;
+      }
+      return out;
+    }
+    return out;
+  }
+  function eventsForRange(rangeStartISO, rangeEndISO) {
+    var out = [];
+    eventsList().forEach(function (ev) {
+      eventOccurrencesInRange(ev, rangeStartISO, rangeEndISO).forEach(function (d) { out.push({ date: d, event: ev }); });
+    });
+    return out;
+  }
+  function eventsForDay(dateISO) { return eventsForRange(dateISO, dateISO).map(function (x) { return x.event; }); }
+  function sortEventsByTime(evs) {
+    return evs.slice().sort(function (a, b) {
+      if (!a.time && !b.time) return 0;
+      if (!a.time) return -1;
+      if (!b.time) return 1;
+      return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0);
+    });
+  }
+  function monthGridDates(year, month) {
+    var first = new Date(year, month, 1);
+    var firstWeekday = (first.getDay() + 6) % 7;
+    var start = new Date(year, month, 1 - firstWeekday);
+    var days = [];
+    for (var i = 0; i < 42; i++) days.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+    return days;
+  }
+  function colorSwatches(defaultColor) {
+    return PERSON_COLORS.map(function (c) {
+      var checked = c === defaultColor ? ' checked' : '';
+      return '<label class="swatch" style="--sc:' + c + '"><input type="radio" name="color" value="' + c + '"' + checked + '></label>';
+    }).join('');
+  }
+  function modalWrap(cls, inner) {
+    return '<div class="overlay" data-action="close-modal"><div class="sheet ' + cls + '" data-action="noop">' + inner + '</div></div>';
+  }
+
+  function renderOnboardingScreen() {
+    return '<div class="onboard"><div class="onboard-card">'
+      + '<h1 class="app-title-lg">Familienkalender</h1>'
+      + '<p class="onboard-lead">Legt los: Trag dich als erste Person ein, dann könnt ihr gemeinsam Termine eintragen.</p>'
+      + '<form data-form="add-person-first">'
+      + '<label class="field-label" for="pname1">Dein Name</label>'
+      + '<input class="text-input" id="pname1" name="name" type="text" placeholder="z. B. Mama" required maxlength="30" autocomplete="off">'
+      + '<div class="field-label">Farbe</div>'
+      + '<div class="color-grid">' + colorSwatches(unusedColor()) + '</div>'
+      + '<button class="btn btn-primary btn-block" type="submit">Loslegen</button>'
+      + '</form></div></div>';
+  }
+  function renderPickerScreen() {
+    var list = peopleList().map(function (p) {
+      return '<button type="button" class="person-pick" data-action="select-person" data-id="' + p.id + '"><span class="dot" style="background:' + p.color + '"></span>' + escapeHtml(p.name) + '</button>';
+    }).join('');
+    return '<div class="onboard"><div class="onboard-card">'
+      + '<h1 class="app-title-lg">Wer bist du?</h1>'
+      + '<div class="person-pick-list">' + list + '</div>'
+      + '<details class="add-person-details"><summary class="link-btn">+ Neue Person hinzufügen</summary>'
+      + '<form data-form="add-person">'
+      + '<label class="field-label" for="pname2">Name</label>'
+      + '<input class="text-input" id="pname2" name="name" type="text" required maxlength="30" autocomplete="off">'
+      + '<div class="field-label">Farbe</div>'
+      + '<div class="color-grid">' + colorSwatches(unusedColor()) + '</div>'
+      + '<button class="btn btn-primary btn-block" type="submit">Hinzufügen</button>'
+      + '</form></details>'
+      + '</div></div>';
+  }
+  function renderCalendarGrid() {
+    var days = monthGridDates(viewYear, viewMonth);
+    var rangeStart = isoDate(days[0].getFullYear(), days[0].getMonth(), days[0].getDate());
+    var rangeEnd = isoDate(days[41].getFullYear(), days[41].getMonth(), days[41].getDate());
+    var occ = eventsForRange(rangeStart, rangeEnd);
+    var byDate = {};
+    occ.forEach(function (o) {
+      if (filterId !== 'all' && o.event.personId !== filterId) return;
+      (byDate[o.date] = byDate[o.date] || []).push(o.event);
+    });
+    var todayIso = todayISO();
+    var maxShow = 3;
+    var cells = days.map(function (d) {
+      var iso = isoDate(d.getFullYear(), d.getMonth(), d.getDate());
+      var inMonth = d.getMonth() === viewMonth;
+      var evs = sortEventsByTime(byDate[iso] || []);
+      var isToday = iso === todayIso;
+      var pills = evs.slice(0, maxShow).map(function (ev) {
+        var p = personById(ev.personId);
+        var color = p ? p.color : '#999999';
+        var label = (ev.time ? ev.time + ' ' : '') + escapeHtml(ev.title);
+        return '<div class="pill" style="background:' + color + ';color:' + contrastText(color) + '">' + label + '</div>';
+      }).join('');
+      var more = evs.length > maxShow ? '<div class="pill-more">+' + (evs.length - maxShow) + ' mehr</div>' : '';
+      return '<button type="button" class="day-cell' + (inMonth ? '' : ' day-outside') + (isToday ? ' day-today' : '') + '" data-action="open-day" data-date="' + iso + '">'
+        + '<span class="day-num">' + d.getDate() + '</span>'
+        + '<div class="day-pills">' + pills + more + '</div>'
+        + '</button>';
+    }).join('');
+    return '<div class="weekday-row">' + WEEKDAYS.map(function (w) { return '<div class="weekday">' + w + '</div>'; }).join('') + '</div>'
+      + '<div class="month-grid">' + cells + '</div>';
+  }
+  function renderDaySheet(date) {
+    var d = parseISO(date);
+    var evs = sortEventsByTime(eventsForDay(date));
+    var items = evs.length ? evs.map(function (ev) {
+      var p = personById(ev.personId);
+      return '<button type="button" class="event-row" data-action="open-event" data-id="' + ev.id + '" data-date="' + date + '">'
+        + '<span class="dot" style="background:' + (p ? p.color : '#999999') + '"></span>'
+        + '<span class="event-row-title">' + escapeHtml(ev.title) + '</span>'
+        + (ev.time ? '<span class="event-row-time">' + ev.time + '</span>' : '')
+        + (ev.recurrence && ev.recurrence !== 'none' ? '<span class="event-row-recur">' + RECUR_LABELS[ev.recurrence] + '</span>' : '')
+        + '</button>';
+    }).join('') : '<p class="empty-hint">Keine Termine an diesem Tag.</p>';
+    return modalWrap('day-sheet', ''
+      + '<div class="sheet-header"><h2>' + formatFullDate(d) + '</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">&times;</button></div>'
+      + '<div class="sheet-body">' + items
+      + '<button type="button" class="btn btn-primary btn-block" data-action="open-add" data-date="' + date + '">+ Termin hinzufügen</button>'
+      + '</div>'
+    );
+  }
+  function renderEventForm(date, eventId) {
+    var editing = !!eventId;
+    var ev = editing ? state.events[eventId] : null;
+    var titleVal = ev ? ev.title : '';
+    var dateVal = ev ? ev.date : date;
+    var hasTime = ev ? !!ev.time : false;
+    var timeVal = ev && ev.time ? ev.time : '';
+    var people = peopleList();
+    var personVal = ev ? ev.personId : (myPersonId || (people[0] && people[0].id) || '');
+    var recurVal = ev ? (ev.recurrence || 'none') : 'none';
+    var personChips = people.map(function (p) {
+      var checked = p.id === personVal ? ' checked' : '';
+      return '<label class="person-radio" style="--pc:' + p.color + ';--pc-text:' + contrastText(p.color) + '"><input type="radio" name="personId" value="' + p.id + '"' + checked + '>' + escapeHtml(p.name) + '</label>';
+    }).join('');
+    var recurOptions = ['none', 'weekly', 'monthly', 'yearly'].map(function (k) {
+      return '<option value="' + k + '"' + (k === recurVal ? ' selected' : '') + '>' + RECUR_LABELS[k] + '</option>';
+    }).join('');
+    return modalWrap('event-sheet', ''
+      + '<div class="sheet-header"><h2>' + (editing ? 'Termin bearbeiten' : 'Neuer Termin') + '</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">&times;</button></div>'
+      + '<form class="sheet-body" data-form="event" data-event-id="' + (eventId || '') + '">'
+      + '<label class="field-label" for="ev-title">Titel</label>'
+      + '<input class="text-input" id="ev-title" name="title" type="text" required maxlength="80" value="' + escapeHtml(titleVal) + '" placeholder="z. B. Zahnarzttermin">'
+      + '<label class="field-label" for="ev-date">Datum</label>'
+      + '<input class="text-input" id="ev-date" name="date" type="date" required value="' + dateVal + '">'
+      + '<label class="checkbox-row" for="ev-hastime"><input type="checkbox" name="hasTime" id="ev-hastime"' + (hasTime ? ' checked' : '') + '>Uhrzeit festlegen</label>'
+      + '<input class="text-input' + (hasTime ? '' : ' field-hidden') + '" id="ev-time" name="time" type="time" value="' + timeVal + '">'
+      + '<div class="field-label">Person</div>'
+      + '<div class="person-radio-row">' + personChips + '</div>'
+      + '<label class="field-label" for="ev-recur">Wiederholung</label>'
+      + '<select class="text-input" id="ev-recur" name="recurrence">' + recurOptions + '</select>'
+      + '<div class="sheet-actions">'
+      + (editing ? '<button type="button" class="btn btn-danger" data-action="delete-event" data-id="' + eventId + '">Löschen</button>' : '<span></span>')
+      + '<button type="submit" class="btn btn-primary">Speichern</button>'
+      + '</div>'
+      + '</form>'
+    );
+  }
+  function renderPeopleModal() {
+    var rows = peopleList().map(function (p) {
+      var count = eventsList().filter(function (e) { return e.personId === p.id; }).length;
+      var isMe = p.id === myPersonId;
+      return '<div class="people-row">'
+        + '<span class="dot" style="background:' + p.color + '"></span>'
+        + '<span class="people-row-name">' + escapeHtml(p.name) + (isMe ? ' <span class="you-tag">(du)</span>' : '') + '</span>'
+        + (!isMe ? '<button type="button" class="link-btn" data-action="select-person" data-id="' + p.id + '">Das bin ich</button>' : '')
+        + '<button type="button" class="link-btn link-danger" data-action="remove-person" data-id="' + p.id + '"' + (count > 0 ? ' disabled title="Hat noch Termine"' : '') + '>Entfernen</button>'
+        + '</div>';
+    }).join('');
+    var addForm = ''
+      + '<div class="field-label" style="margin-top:16px">Neue Person</div>'
+      + '<form data-form="add-person" class="inline-add-person">'
+      + '<input class="text-input" name="name" type="text" placeholder="Name" required maxlength="30" autocomplete="off">'
+      + '<div class="color-grid">' + colorSwatches(unusedColor()) + '</div>'
+      + '<button type="submit" class="btn btn-primary btn-block">Hinzufügen</button>'
+      + '</form>';
+    return modalWrap('people-sheet', ''
+      + '<div class="sheet-header"><h2>Personen</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">&times;</button></div>'
+      + '<div class="sheet-body">' + rows + addForm + '</div>'
+    );
+  }
+  function renderActiveModal() {
+    if (!activeModal) return '';
+    if (activeModal.type === 'day') return renderDaySheet(activeModal.date);
+    if (activeModal.type === 'eventForm') return renderEventForm(activeModal.date, activeModal.eventId);
+    if (activeModal.type === 'people') return renderPeopleModal();
+    return '';
+  }
+  function renderCalendarScreen() {
+    var me = personById(myPersonId);
+    var monthLabel = MONTHS[viewMonth] + ' ' + viewYear;
+    var people = peopleList();
+    var chips = '<button type="button" class="chip' + (filterId === 'all' ? ' chip-active' : '') + '" data-action="filter-person" data-id="all">Alle</button>'
+      + people.map(function (p) {
+        var active = filterId === p.id;
+        var style = active ? ('background:' + p.color + ';color:' + contrastText(p.color) + ';border-color:' + p.color) : ('border-color:' + p.color + ';color:' + p.color);
+        return '<button type="button" class="chip' + (active ? ' chip-active' : '') + '" data-action="filter-person" data-id="' + p.id + '" style="' + style + '"><span class="chip-dot" style="background:' + p.color + '"></span>' + escapeHtml(p.name) + '</button>';
+      }).join('');
+    return (isOnline ? '' : '<div class="offline-banner">Keine Verbindung – Änderungen werden synchronisiert, sobald du wieder online bist.</div>')
+      + '<header class="topbar">'
+      + '<span class="app-title">Familienkalender</span>'
+      + '<div class="topbar-actions">'
+      + '<button type="button" class="pill-btn" data-action="open-people">'
+      + (me ? '<span class="dot" style="background:' + me.color + '"></span>' + escapeHtml(me.name) : 'Personen')
+      + '</button>'
+      + '</div>'
+      + '</header>'
+      + '<div class="month-nav">'
+      + '<button type="button" class="icon-btn" data-action="nav-prev" aria-label="Vorheriger Monat">&#8249;</button>'
+      + '<div class="month-label">' + monthLabel + '</div>'
+      + '<button type="button" class="icon-btn" data-action="nav-next" aria-label="Nächster Monat">&#8250;</button>'
+      + '<button type="button" class="btn-today" data-action="nav-today">Heute</button>'
+      + '</div>'
+      + '<div class="chip-row">' + chips + '</div>'
+      + renderCalendarGrid()
+      + '<button type="button" class="fab" data-action="open-add" aria-label="Termin hinzufügen">+</button>'
+      + renderActiveModal();
+  }
+  function render() {
+    if (!peopleLoaded || !eventsLoaded) { appEl.innerHTML = '<div class="loading-screen">Familienkalender lädt …</div>'; return; }
+    var screen;
+    if (peopleList().length === 0) screen = renderOnboardingScreen();
+    else if (!myPersonId || !personById(myPersonId)) screen = renderPickerScreen();
+    else screen = renderCalendarScreen();
+    appEl.innerHTML = screen;
+  }
+
+  var toastTimer = null;
+  function showToast(msg) {
+    var el = document.getElementById('toast');
+    if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; document.body.appendChild(el); }
+    el.textContent = msg;
+    el.classList.add('toast-show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('toast-show'); }, 3200);
+  }
+
+  function saveViewPos() { safeSet('fk_viewYear', viewYear); safeSet('fk_viewMonth', viewMonth); }
+  function handleSelectPerson(id) { myPersonId = id; safeSet('fk_myPersonId', id); activeModal = null; render(); }
+
+  function handleAddPerson(form) {
+    var fd = new FormData(form);
+    var name = (fd.get('name') || '').toString().trim();
+    var color = (fd.get('color') || '').toString() || unusedColor();
+    if (!name) { showToast('Bitte einen Namen eingeben.'); return; }
+    var ref = db.ref('people').push();
+    ref.set({ name: name.slice(0, 30), color: color }).then(function () {
+      myPersonId = ref.key;
+      safeSet('fk_myPersonId', ref.key);
+      activeModal = null;
+      render();
+    }).catch(function (err) { showToast('Speichern fehlgeschlagen: ' + err.message); });
+  }
+
+  function handleSaveEvent(form) {
+    var fd = new FormData(form);
+    var title = (fd.get('title') || '').toString().trim();
+    var date = (fd.get('date') || '').toString();
+    var hasTime = fd.get('hasTime') === 'on';
+    var time = hasTime ? (fd.get('time') || '').toString() : '';
+    var personId = (fd.get('personId') || '').toString();
+    var recurrence = (fd.get('recurrence') || 'none').toString();
+    if (!title || !date || !personId) { showToast('Bitte alle Pflichtfelder ausfüllen.'); return; }
+    var eventId = form.getAttribute('data-event-id');
+    var data = { title: title.slice(0, 80), date: date, time: time || null, personId: personId, recurrence: recurrence };
+    var ref = eventId ? db.ref('events/' + eventId) : db.ref('events').push();
+    ref.set(data).then(function () { activeModal = null; render(); })
+      .catch(function (err) { showToast('Speichern fehlgeschlagen: ' + err.message); });
+  }
+
+  function handleDeleteEvent(id) {
+    db.ref('events/' + id).remove().then(function () { activeModal = null; render(); })
+      .catch(function (err) { showToast('Löschen fehlgeschlagen: ' + err.message); });
+  }
+
+  function handleRemovePerson(id) {
+    var hasEvents = eventsList().some(function (e) { return e.personId === id; });
+    if (hasEvents) { showToast('Person hat noch Termine – erst Termine löschen oder verschieben.'); return; }
+    db.ref('people/' + id).remove().then(function () {
+      if (myPersonId === id) { myPersonId = null; safeRemove('fk_myPersonId'); }
+      render();
+    }).catch(function (err) { showToast('Entfernen fehlgeschlagen: ' + err.message); });
+  }
+
+  appEl.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-action]');
+    if (!el) return;
+    var action = el.getAttribute('data-action');
+    if (action === 'noop') return;
+    if (action === 'close-modal') { activeModal = null; render(); return; }
+    if (action === 'nav-prev') { viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } saveViewPos(); render(); return; }
+    if (action === 'nav-next') { viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } saveViewPos(); render(); return; }
+    if (action === 'nav-today') { var t = new Date(); viewYear = t.getFullYear(); viewMonth = t.getMonth(); saveViewPos(); render(); return; }
+    if (action === 'open-day') { activeModal = { type: 'day', date: el.getAttribute('data-date') }; render(); return; }
+    if (action === 'open-add') { var dd = el.getAttribute('data-date') || todayISO(); activeModal = { type: 'eventForm', date: dd, eventId: null }; render(); return; }
+    if (action === 'open-event') { activeModal = { type: 'eventForm', date: el.getAttribute('data-date'), eventId: el.getAttribute('data-id') }; render(); return; }
+    if (action === 'filter-person') { filterId = el.getAttribute('data-id'); safeSet('fk_filterId', filterId); render(); return; }
+    if (action === 'open-people') { activeModal = { type: 'people' }; render(); return; }
+    if (action === 'select-person') { handleSelectPerson(el.getAttribute('data-id')); return; }
+    if (action === 'delete-event') { var eid = el.getAttribute('data-id'); if (window.confirm('Diesen Termin wirklich löschen?')) handleDeleteEvent(eid); return; }
+    if (action === 'remove-person') { if (el.disabled) return; var pid = el.getAttribute('data-id'); if (window.confirm('Diese Person wirklich entfernen?')) handleRemovePerson(pid); return; }
+  });
+  appEl.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (form.matches('[data-form="add-person-first"]') || form.matches('[data-form="add-person"]')) { e.preventDefault(); handleAddPerson(form); }
+    else if (form.matches('[data-form="event"]')) { e.preventDefault(); handleSaveEvent(form); }
+  });
+
+  db.ref('people').on('value', function (snap) {
+    state.people = snap.val() || {};
+    peopleLoaded = true; showingCachedSnapshot = false;
+    try { safeSet('fk_snapshot_people', JSON.stringify(state.people)); } catch (e) { /* ignore */ }
+    render();
+  }, function (err) { showToast('Verbindung zur Datenbank fehlgeschlagen: ' + err.message); });
+
+  db.ref('events').on('value', function (snap) {
+    state.events = snap.val() || {};
+    eventsLoaded = true; showingCachedSnapshot = false;
+    try { safeSet('fk_snapshot_events', JSON.stringify(state.events)); } catch (e) { /* ignore */ }
+    render();
+  }, function (err) { showToast('Verbindung zur Datenbank fehlgeschlagen: ' + err.message); });
+
+  db.ref('.info/connected').on('value', function (snap) { isOnline = !!snap.val(); if (peopleLoaded && eventsLoaded) render(); });
+
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () { /* offline install just won't be available */ });
+    });
+  }
+})();
+</script>
+</body>
+</html>
