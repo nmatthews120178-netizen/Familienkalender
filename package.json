@@ -1,0 +1,13 @@
+{
+  "name": "familienkalender-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zieht Outlook/iCloud-Kalenderlinks der Familienmitglieder und schreibt nur Frei/Beschäftigt-Zeiten in die Firebase-Datenbank des Familienkalenders.",
+  "main": "sync-calendars.js",
+  "scripts": {
+    "sync": "node sync-calendars.js"
+  },
+  "dependencies": {
+    "node-ical": "^0.27.1"
+  }
+}
